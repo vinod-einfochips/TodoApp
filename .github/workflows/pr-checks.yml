@@ -1,8 +1,10 @@
-name: PR Checks
+name: PR Checks (Disabled)
 
+# Workflow disabled - only ChatGPT review is active
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+  # pull_request:
+  #   types: [opened, synchronize, reopened]
 
 permissions:
   contents: read

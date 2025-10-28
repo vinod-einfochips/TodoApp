@@ -1,0 +1,167 @@
+name: ChatGPT PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD)
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No files changed"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Save changed files list
+          echo "$CHANGED_FILES" > changed_files.txt
+
+      - name: Generate PR diff for review
+        if: steps.changed-files.outputs.has_changes == 'true'
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          
+          # Generate diff with file context
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr_diff.txt
+          
+          # Check size and truncate if needed
+          LINES=$(wc -l < pr_diff.txt)
+          echo "Total diff lines: $LINES"
+          
+          if [ $LINES -gt 5000 ]; then
+            echo "⚠️ Diff too large, truncating to 5000 lines"
+            head -n 5000 pr_diff.txt > pr_diff_truncated.txt
+            mv pr_diff_truncated.txt pr_diff.txt
+            echo "TRUNCATED=true" >> $GITHUB_ENV
+          else
+            echo "TRUNCATED=false" >> $GITHUB_ENV
+          fi
+
+      - name: Install jq
+        if: steps.changed-files.outputs.has_changes == 'true'
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Generate ChatGPT Review
+        if: steps.changed-files.outputs.has_changes == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "🤖 Generating PR review with ChatGPT..."
+          
+          # Escape diff content for JSON
+          DIFF_CONTENT=$(cat pr_diff.txt | jq -Rs .)
+          
+          # Get PR details
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_DESCRIPTION="${{ github.event.pull_request.body }}"
+          BRANCH_NAME="${{ github.head_ref }}"
+          
+          # Create JSON payload with detailed instructions
+          cat > payload.json <<EOF
+          {
+            "model": "gpt-4o-mini",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are an expert Android/Kotlin code reviewer. Review ONLY the changes in the PR branch.\n\nProvide:\n1. **PR Summary** - Brief overview of what changed\n2. **Code Quality** - Issues, bugs, or improvements needed\n3. **Inline Suggestions** - Specific line-by-line recommendations with code examples\n4. **Best Practices** - Android/Kotlin best practices violations\n5. **Performance** - Any performance concerns\n6. **Security** - Security issues if any\n\nFormat response in clear Markdown with code blocks for suggestions."
+              },
+              {
+                "role": "user",
+                "content": "Review this PR:\n\n**Branch:** $BRANCH_NAME\n**Title:** $PR_TITLE\n\n**Changes:**\n$DIFF_CONTENT"
+              }
+            ],
+            "temperature": 0.2,
+            "max_tokens": 3000
+          }
+          EOF
+          
+          # Call OpenAI API
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json \
+            https://api.openai.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d @payload.json)
+          
+          # Check response
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "❌ API call failed with status: $HTTP_CODE"
+            cat response.json
+            exit 1
+          fi
+          
+          # Extract review
+          REVIEW=$(jq -r '.choices[0].message.content' response.json)
+          
+          # Create review comment
+          cat > review.md <<EOF
+          ## 🤖 ChatGPT Code Review
+          
+          **Branch:** \`$BRANCH_NAME\`
+          **Reviewed:** $(date -u +"%Y-%m-%d %H:%M UTC")
+          
+          ---
+          
+          $REVIEW
+          
+          ---
+          
+          EOF
+          
+          # Add truncation warning if needed
+          if [ "$TRUNCATED" == "true" ]; then
+            echo "" >> review.md
+            echo "> ⚠️ **Note:** Diff was truncated to 5000 lines. Large PRs may have incomplete reviews." >> review.md
+          fi
+          
+          # Add changed files summary
+          echo "" >> review.md
+          echo "### 📁 Files Changed" >> review.md
+          echo "\`\`\`" >> review.md
+          cat changed_files.txt >> review.md
+          echo "\`\`\`" >> review.md
+          
+          echo "✅ Review generated successfully"
+
+      - name: Post review comment
+        if: steps.changed-files.outputs.has_changes == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: chatgpt-code-review
+          path: review.md
+
+      - name: Upload debug artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chatgpt-review-debug
+          path: |
+            pr_diff.txt
+            changed_files.txt
+            payload.json
+            response.json
+          retention-days: 1

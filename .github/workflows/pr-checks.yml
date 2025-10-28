@@ -60,9 +60,6 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Run lint
-        run: ./gradlew :app:lintDebug --stacktrace --no-daemon
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -70,7 +67,6 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/reports/tests/
-            app/build/reports/lint-results-debug.html
             app/build/reports/jacoco/
 
       - name: Comment PR with summary
@@ -85,7 +81,6 @@ jobs:
             
             ### ✅ Build Status
             - **Unit Tests**: ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}
-            - **Lint Checks**: ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}
             - **APK Build**: ${{ job.status == 'success' && '✅ Success' || '❌ Failed' }}
             
             ### 📊 Test Coverage

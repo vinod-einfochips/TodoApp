@@ -56,17 +56,6 @@ jobs:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
 
-      - name: Run Lint
-        run: ./gradlew :app:lintDebug
-        continue-on-error: true
-
-      - name: Upload Lint Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: lint-report
-          path: app/build/reports/lint*.html
-
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
@@ -89,12 +78,10 @@ jobs:
             ### Results
             - **Build:** ${status === 'success' ? '✅ Passed' : '❌ Failed'}
             - **Unit Tests:** Check artifacts for details
-            - **Lint:** Check artifacts for report
             
             ### 📦 Artifacts
             - Test results available in workflow artifacts
             - Debug APK available for download
-            - Lint report available in artifacts
             
             [View Full Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
             `;

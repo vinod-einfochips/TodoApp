@@ -1,3 +1,0 @@
-This file should contain the gradle-wrapper.jar binary.
-In a real project, this would be downloaded automatically by Gradle.
-When you run the project in Android Studio, it will download this automatically.

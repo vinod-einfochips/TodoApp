@@ -1,0 +1,111 @@
+name: Android Build and Test
+
+on:
+  pull_request:
+    branches: [ main, develop, master ]
+  push:
+    branches: [ main, develop, master ]
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: wrapper
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build --stacktrace --no-daemon
+        continue-on-error: false
+
+      - name: Run Unit Tests
+        run: ./gradlew test --stacktrace --no-daemon
+        continue-on-error: false
+
+      - name: Generate Test Report
+        if: always()
+        run: ./gradlew testDebugUnitTest --stacktrace --no-daemon
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: Run Lint
+        run: ./gradlew lintDebug --stacktrace --no-daemon
+        continue-on-error: true
+
+      - name: Upload Lint Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lint-report
+          path: app/build/reports/lint*.html
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: |
+            app/build/test-results/**/*.xml
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && always()
+        with:
+          script: |
+            const fs = require('fs');
+            const status = '${{ job.status }}';
+            
+            const comment = `## 🤖 Build & Test Results
+            
+            **Status:** ${status === 'success' ? '✅ Success' : '❌ Failed'}
+            
+            ### Results
+            - **Build:** ${status === 'success' ? '✅ Passed' : '❌ Failed'}
+            - **Unit Tests:** Check artifacts for details
+            - **Lint:** Check artifacts for report
+            
+            ### 📦 Artifacts
+            - Test results available in workflow artifacts
+            - Debug APK available for download
+            - Lint report available in artifacts
+            
+            [View Full Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

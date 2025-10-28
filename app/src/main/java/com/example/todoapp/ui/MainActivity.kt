@@ -21,13 +21,15 @@ class MainActivity : AppCompatActivity() {
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHostFragment.navController
-        
+
+        Listener()
+    }
+    fun Listener(){
         // Setup FAB click listener
         binding.fab.setOnClickListener {
             navController.navigate(R.id.addEditTodoFragment)
         }
     }
-
     override fun onSupportNavigateUp(): Boolean {
         return navController.navigateUp() || super.onSupportNavigateUp()
     }

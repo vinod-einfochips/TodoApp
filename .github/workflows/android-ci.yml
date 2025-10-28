@@ -1,11 +1,10 @@
-name: Android CI (Disabled)
+name: Android CI
 
-# Workflow disabled - only ChatGPT review is active
 on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
-  # pull_request:
-  #   branches: [ main, develop ]
-  #   types: [opened, synchronize, reopened]
 
 permissions:
   contents: read

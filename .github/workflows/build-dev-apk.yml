@@ -1,12 +1,11 @@
-name: Build Dev APK (Disabled)
+name: Build Dev APK
 
-# Workflow disabled - only ChatGPT review is active
 on:
+  pull_request:
+    branches:
+      - develop
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
-  # pull_request:
-  #   branches:
-  #     - develop
-  #   types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -84,7 +83,12 @@ jobs:
         run: |
           echo "### Build Information" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "**PR:** #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Branch:** ${{ github.head_ref }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           

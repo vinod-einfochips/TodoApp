@@ -73,32 +73,26 @@ jobs:
         run: |
           echo "🤖 Generating PR review with ChatGPT..."
           
-          # Escape diff content for JSON
-          DIFF_CONTENT=$(cat pr_diff.txt | jq -Rs .)
-          
           # Get PR details
           PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_DESCRIPTION="${{ github.event.pull_request.body }}"
           BRANCH_NAME="${{ github.head_ref }}"
           
-          # Create JSON payload with detailed instructions
-          cat > payload.json <<EOF
-          {
-            "model": "gpt-4o-mini",
-            "messages": [
-              {
-                "role": "system",
-                "content": "You are an expert Android/Kotlin code reviewer. Review ONLY the changes in the PR branch.\n\nProvide:\n1. **PR Summary** - Brief overview of what changed\n2. **Code Quality** - Issues, bugs, or improvements needed\n3. **Inline Suggestions** - Specific line-by-line recommendations with code examples\n4. **Best Practices** - Android/Kotlin best practices violations\n5. **Performance** - Any performance concerns\n6. **Security** - Security issues if any\n\nFormat response in clear Markdown with code blocks for suggestions."
-              },
-              {
-                "role": "user",
-                "content": "Review this PR:\n\n**Branch:** $BRANCH_NAME\n**Title:** $PR_TITLE\n\n**Changes:**\n$DIFF_CONTENT"
-              }
-            ],
-            "temperature": 0.2,
-            "max_tokens": 3000
-          }
-          EOF
+          # Create JSON payload using jq to properly escape everything
+          jq -n \
+            --arg model "gpt-4o-mini" \
+            --arg system_prompt "You are an expert Android and Kotlin reviewer specializing in mobile app architecture, Jetpack libraries, and clean code practices. Review ONLY the changes introduced in this pull request.Your task: 1. **Summary** – Provide a concise, human-readable summary of what the PR changes or adds. 2. **Code Quality & Readability** – Point out unnecessary complexity, naming issues, redundant code, or missing documentation. 3. **Inline Suggestions** – For specific lines or blocks, suggest direct improvements using Markdown code blocks. Keep explanations short and technical. 4. **Best Practices** – Check for violations of Android and Kotlin best practices (e.g., coroutines, ViewModel scope, lifecycle handling, Compose optimization, null-safety, immutability). 5. **Performance** – Highlight possible inefficiencies (UI rendering, memory leaks, unnecessary recompositions, I/O on main thread). 6. **Security & Privacy** – Detect potential security concerns (insecure storage, weak encryption, exposed keys, unsafe network handling). 7. **Testing & Maintainability** – Suggest where tests might be missing or how to improve test coverage or modularity.   **Style Guidelines:** - Use ✅ and ⚠️ icons for clarity - Provide concrete Kotlin examples for improvements. - Keep your tone constructive and concise. - Return the final report in clean **Markdown format** with headings and code blocks." \
+            --arg branch "$BRANCH_NAME" \
+            --arg title "$PR_TITLE" \
+            --rawfile diff pr_diff.txt \
+            '{
+              model: $model,
+              messages: [
+                {role: "system", content: $system_prompt},
+                {role: "user", content: ("Review this PR:\n\nBranch: " + $branch + "\nTitle: " + $title + "\n\nChanges:\n" + $diff)}
+              ],
+              temperature: 0.2,
+              max_tokens: 3000
+            }' > payload.json
           
           # Call OpenAI API
           HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json \

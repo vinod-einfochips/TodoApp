@@ -15,6 +15,6 @@ jobs:
         with:
           github-token: ${{ github.token }}
           ms-teams-webhook-uri: ${{ secrets.TEAMS_WEBHOOK_URL }}
-          notification-summary: "New Pull Request: ${{ github.event.pull_request.title }}"
+          notification-summary: "Manual workflow run on ${{ github.ref_name }}"
           notification-color: 17a2b8
           timezone: Asia/Kolkata

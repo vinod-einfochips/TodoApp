@@ -3,8 +3,7 @@ name: Android Build and Test
 on:
   pull_request:
     branches: [ main, develop, master ]
-  push:
-    branches: [ main, develop, master ]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read

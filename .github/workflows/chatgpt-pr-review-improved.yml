@@ -1,0 +1,132 @@
+name: ChatGPT PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          
+          # Generate diff and limit size (OpenAI has token limits)
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > full_diff.txt
+          
+          # Check diff size and truncate if needed (max ~8000 lines for safety)
+          LINES=$(wc -l < full_diff.txt)
+          if [ $LINES -gt 8000 ]; then
+            echo "⚠️ Diff is too large ($LINES lines). Truncating to 8000 lines." > pr_diff.txt
+            head -n 8000 full_diff.txt >> pr_diff.txt
+            echo "TRUNCATED=true" >> $GITHUB_OUTPUT
+          else
+            cp full_diff.txt pr_diff.txt
+            echo "TRUNCATED=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check if diff is empty
+          if [ ! -s pr_diff.txt ]; then
+            echo "No changes detected in diff"
+            echo "EMPTY=true" >> $GITHUB_OUTPUT
+          else
+            echo "EMPTY=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install jq
+        if: steps.diff.outputs.EMPTY == 'false'
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run ChatGPT Review
+        if: steps.diff.outputs.EMPTY == 'false'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "🤖 Sending PR diff to ChatGPT for review..."
+          
+          # Escape the diff content for JSON
+          DIFF_CONTENT=$(cat pr_diff.txt | jq -Rs .)
+          
+          # Create JSON payload
+          cat > payload.json <<EOF
+          {
+            "model": "gpt-4o-mini",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a senior Android/Kotlin code reviewer. Analyze the PR diff and provide:\n1. Summary of changes\n2. Potential bugs or issues\n3. Performance concerns\n4. Security issues\n5. Best practice violations\n6. Suggestions for improvement\n\nFormat your response in Markdown with clear sections."
+              },
+              {
+                "role": "user",
+                "content": $DIFF_CONTENT
+              }
+            ],
+            "temperature": 0.3,
+            "max_tokens": 2000
+          }
+          EOF
+          
+          # Call OpenAI API
+          HTTP_CODE=$(curl -w "%{http_code}" -o response.json \
+            https://api.openai.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d @payload.json)
+          
+          # Check if API call was successful
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "❌ OpenAI API call failed with status code: $HTTP_CODE"
+            cat response.json
+            exit 1
+          fi
+          
+          # Extract review content
+          REVIEW=$(jq -r '.choices[0].message.content' response.json)
+          
+          # Create review comment
+          cat > review.md <<EOF
+          ### 🤖 ChatGPT PR Review
+          
+          $REVIEW
+          
+          ---
+          
+          EOF
+          
+          # Add truncation warning if needed
+          if [ "${{ steps.diff.outputs.TRUNCATED }}" == "true" ]; then
+            echo "⚠️ **Note:** The diff was truncated due to size limits. This review covers the first 8000 lines only." >> review.md
+          fi
+          
+          echo "✅ Review generated successfully"
+
+      - name: Comment Review on PR
+        if: steps.diff.outputs.EMPTY == 'false'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: chatgpt-review
+          path: review.md
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-files
+          path: |
+            pr_diff.txt
+            payload.json
+            response.json
+          retention-days: 1

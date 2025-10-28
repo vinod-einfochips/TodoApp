@@ -1,0 +1,22 @@
+name: Notify Microsoft Teams on PR
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+jobs:
+  notify_teams:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send PR notification to Teams
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          SLACK_USERNAME: "GitHub PR Bot"
+          SLACK_TITLE: "📢 New Pull Request Created!"
+          SLACK_MESSAGE: |
+            *Repository:* ${{ github.repository }}
+            *PR Title:* ${{ github.event.pull_request.title }}
+            *Author:* ${{ github.actor }}
+            *Branch:* ${{ github.head_ref }} → ${{ github.base_ref }}
+            *URL:* ${{ github.event.pull_request.html_url }}

@@ -35,7 +35,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run Unit Tests
-        run: ./gradlew :app:testDebugUnitTest
+        run: './gradlew :app:testDebugUnitTest'
         continue-on-error: false
 
       - name: Upload Test Results
@@ -48,7 +48,7 @@ jobs:
             app/build/test-results/
 
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug
+        run: './gradlew :app:assembleDebug'
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
@@ -58,7 +58,7 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
 
       - name: Run Lint
-        run: ./gradlew :app:lintDebug
+        run: './gradlew :app:lintDebug'
         continue-on-error: true
 
       - name: Upload Lint Report

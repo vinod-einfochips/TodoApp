@@ -34,7 +34,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Run unit tests
-        run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
+        run: './gradlew :app:testDebugUnitTest --stacktrace --no-daemon'
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -81,7 +81,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
+        run: './gradlew :app:assembleDebug --stacktrace --no-daemon'
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -90,7 +90,7 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease --stacktrace --no-daemon
+        run: './gradlew :app:assembleRelease --stacktrace --no-daemon'
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
@@ -120,7 +120,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Run lint
-        run: ./gradlew :app:lintDebug --stacktrace --no-daemon
+        run: './gradlew :app:lintDebug --stacktrace --no-daemon'
 
       - name: Upload lint results
         uses: actions/upload-artifact@v4

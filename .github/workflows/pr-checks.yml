@@ -34,7 +34,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Run unit tests with coverage
-        run: ./gradlew :app:testDebugUnitTest :app:jacocoTestReport --stacktrace --no-daemon
+        run: './gradlew :app:testDebugUnitTest :app:jacocoTestReport --stacktrace --no-daemon'
 
       - name: Generate test report
         uses: dorny/test-reporter@v1
@@ -58,10 +58,10 @@ jobs:
           title: Code Coverage Report
 
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
+        run: './gradlew :app:assembleDebug --stacktrace --no-daemon'
 
       - name: Run lint
-        run: ./gradlew :app:lintDebug --stacktrace --no-daemon
+        run: './gradlew :app:lintDebug --stacktrace --no-daemon'
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

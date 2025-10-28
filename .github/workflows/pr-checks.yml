@@ -1,0 +1,108 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v2
+
+      - name: Run unit tests with coverage
+        run: ./gradlew testDebugUnitTest jacocoTestReport --stacktrace
+
+      - name: Generate test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Unit Test Results
+          path: app/build/test-results/testDebugUnitTest/*.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      - name: Add coverage to PR
+        id: jacoco
+        uses: madrapps/jacoco-report@v1.6.1
+        if: github.event_name == 'pull_request'
+        with:
+          paths: |
+            ${{ github.workspace }}/app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 40
+          min-coverage-changed-files: 60
+          title: Code Coverage Report
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Run lint
+        run: ./gradlew lintDebug --stacktrace
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/reports/tests/
+            app/build/reports/lint-results-debug.html
+            app/build/reports/jacoco/
+
+      - name: Comment PR with summary
+        uses: actions/github-script@v7
+        if: always() && github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const testResults = '${{ steps.jacoco.outputs.coverage-overall }}';
+            
+            const comment = `## 🤖 CI Build Summary
+            
+            ### ✅ Build Status
+            - **Unit Tests**: ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}
+            - **Lint Checks**: ${{ job.status == 'success' && '✅ Passed' || '❌ Failed' }}
+            - **APK Build**: ${{ job.status == 'success' && '✅ Success' || '❌ Failed' }}
+            
+            ### 📊 Test Coverage
+            - **Overall Coverage**: ${testResults}%
+            
+            ### 📦 Artifacts
+            - Debug APK available in workflow artifacts
+            - Test reports available in workflow artifacts
+            
+            ### 📝 Next Steps
+            ${testResults < 40 ? '⚠️ Coverage is below 40%. Please add more tests.' : '✅ Coverage looks good!'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Fail if tests failed
+        if: failure()
+        run: |
+          echo "❌ CI checks failed. Please fix the issues before merging."
+          exit 1

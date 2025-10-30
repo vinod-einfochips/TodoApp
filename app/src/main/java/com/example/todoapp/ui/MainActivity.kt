@@ -10,27 +10,29 @@ import com.example.todoapp.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var navController: NavController
+    private lateinit var nav: NavController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        init()
+        Listeners()
+    }
 
+    fun init(){
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
-        navController = navHostFragment.navController
-
-        Listener()
+        nav = navHostFragment.navController
     }
-    fun Listener(){
+   private fun Listeners(){
         // Setup FAB click listener
         binding.fab.setOnClickListener {
-            navController.navigate(R.id.addEditTodoFragment)
+            nav.navigate(R.id.addEditTodoFragment)
         }
     }
     override fun onSupportNavigateUp(): Boolean {
-        return navController.navigateUp() || super.onSupportNavigateUp()
+        return nav.navigateUp() || super.onSupportNavigateUp()
     }
 }

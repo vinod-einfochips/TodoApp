@@ -126,13 +126,13 @@ if: github.event.pull_request.draft == false
 ### Replace Old File
 ```bash
 # Remove old version
-rm .github/workflows/chatgpt-pr-review.yml
+rm .github/workflows/ai-pr-review.yml
 
 # Rename improved version
-mv .github/workflows/chatgpt-pr-review-improved.yml .github/workflows/chatgpt-pr-review.yml
+mv .github/workflows/chatgpt-pr-review-improved.yml .github/workflows/ai-pr-review.yml
 
 # Commit
-git add .github/workflows/chatgpt-pr-review.yml
+git add .github/workflows/ai-pr-review.yml
 git commit -m "feat: Improve ChatGPT PR review workflow with error handling"
 git push
 ```

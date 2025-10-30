@@ -18,7 +18,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         init()
-        Listeners()
+        listeners()
     }
 
     fun init(){
@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity() {
             .findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         nav = navHostFragment.navController
     }
-   private fun Listeners(){
+   private fun listeners(){
         // Setup FAB click listener
         binding.fab.setOnClickListener {
             nav.navigate(R.id.addEditTodoFragment)
